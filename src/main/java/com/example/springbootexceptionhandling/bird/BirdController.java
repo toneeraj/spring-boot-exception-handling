@@ -1,11 +1,19 @@
 package com.example.springbootexceptionhandling.bird;
 
-import com.example.springbootexceptionhandling.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 import javax.validation.Valid;
-import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.springbootexceptionhandling.EntityNotFoundException;
 
 @RestController
 @RequestMapping("/birds")
@@ -32,6 +40,11 @@ public class BirdController {
     @GetMapping(value = "/noexception/{birdId}")
     public Bird getBirdNoException(@PathVariable("birdId") Long birdId) throws EntityNotFoundException {
         return birdService.getBirdNoException(birdId);
+    }
+    
+    @GetMapping(value = "/runtimeexception/{birdId}")
+    public Bird getBirdRunTimeException(@PathVariable("birdId") Long birdId) {
+        return birdService.getBirdRuntimeException(birdId);
     }
 
 
