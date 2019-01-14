@@ -1,11 +1,14 @@
 package com.example.springbootexceptionhandling.bird;
 
-import com.example.springbootexceptionhandling.EntityNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.example.springbootexceptionhandling.BirdNotFoundException;
+import com.example.springbootexceptionhandling.EntityNotFoundException;
 
 @Service
 public class BirdService {
@@ -14,15 +17,24 @@ public class BirdService {
     private BirdRepository birdRepository;
 
     public Bird getBirdNoException(Long birdId) throws EntityNotFoundException {
-        return birdRepository.findOne(birdId);
+        
+        Optional<Bird> bird = birdRepository.findById(birdId);
+        
+        if (bird.isPresent()) {
+        	return bird.get();
+        } else {
+        	 throw new EntityNotFoundException(Bird.class, "id", birdId.toString());
+        }
+    	
     }
 
     public Bird getBird(Long birdId) throws EntityNotFoundException {
-        Bird bird = birdRepository.findOne(birdId);
-        if (bird == null) {
+    	
+    	 Optional<Bird> bird = birdRepository.findById(birdId);
+    	if (!bird.isPresent()) {
             throw new EntityNotFoundException(Bird.class, "id", birdId.toString());
         }
-        return bird;
+        return bird.get();
     }
 
     public Bird createBird(Bird bird) {
@@ -33,12 +45,20 @@ public class BirdService {
         List<Bird> birds = new ArrayList<>();
 
         for (Long birdId : birdCollection.getBirdsIds()) {
-            Bird bird = birdRepository.findOne(birdId);
-            if (bird == null) {
+            Optional<Bird> bird = birdRepository.findById(birdId);
+            if (!bird.isPresent()) {
                 throw new EntityNotFoundException(Bird.class, "id", birdId.toString());
             }
-            birds.add(bird);
+            birds.add(bird.get());
         }
         return birds;
     }
+
+	public Bird getBirdRuntimeException(Long birdId)  {
+	     Optional<Bird> bird = birdRepository.findById(birdId);
+	        if (!bird.isPresent()) {
+	            throw new BirdNotFoundException(Bird.class, "id", birdId.toString());
+	        }
+	        return bird.get();
+	}
 }

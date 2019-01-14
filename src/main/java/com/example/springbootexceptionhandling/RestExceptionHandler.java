@@ -1,7 +1,16 @@
 package com.example.springbootexceptionhandling;
 
-import lombok.extern.slf4j.Slf4j;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.IntStream;
+
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.MessageSource;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,15 +30,25 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
+import lombok.extern.slf4j.Slf4j;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @ControllerAdvice
 @Slf4j
 public class RestExceptionHandler extends ResponseEntityExceptionHandler {
+	
+	/**
+	 * Externalize the exception error messages 
+	 */
+    private MessageSource exceptionErrorMessageSource;
+    
+    
+    public RestExceptionHandler(@Qualifier("exceptionErrorMessageSource") MessageSource exceptionErrorMessageSource) {
+		super();
+		this.exceptionErrorMessageSource = exceptionErrorMessageSource;
+	}
 
-    /**
+	/**
      * Handle MissingServletRequestParameterException. Triggered when a 'required' request parameter is missing.
      *
      * @param ex      MissingServletRequestParameterException
@@ -117,6 +136,36 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
             EntityNotFoundException ex) {
         ApiError apiError = new ApiError(NOT_FOUND);
         apiError.setMessage(ex.getMessage());
+        return buildResponseEntity(apiError);
+    }
+    
+    /**
+     * Handles custom application runtime exception thrown. Created to encapsulate errors with more detail specific to application.
+     * Any custom application exception class  which extends BaseRuntimeException will be handled here.
+     * 
+     * The custom application exception class defines the httpStatus, errorCode (in ErrorType enum) and errorMessage (in exception_error_messages.properties file)
+     * 
+     * The service / repository class which will raise this exception will pass the error message arguments specific to that error. 
+     * @param ex
+     * @return
+     */
+    @ExceptionHandler(BaseRuntimeException.class)
+    protected ResponseEntity<Object> handleBaseException(RuntimeException ex) {
+
+        BaseRuntimeException baseRuntimeException = (BaseRuntimeException) ex;
+
+        HttpStatus httpStatus = baseRuntimeException.getHttpStatus();
+        
+        ErrorType errorType = baseRuntimeException.getErrorType();
+        String errorCode = baseRuntimeException.getErrorType().name();
+        Object[] errorArgs = baseRuntimeException.getArgs();
+        Class errorClazz = baseRuntimeException.getClazz();
+        
+        String errorMessage = generateMessage(errorClazz.getSimpleName(), errorType, toMap(String.class, String.class, errorArgs));
+
+        ApiError apiError = new ApiError(httpStatus);
+        apiError.setMessage(errorMessage);
+        log.error("handle BaseException. http status: {}, error code : {}, error message: {}, ex: {}", httpStatus, errorCode, errorMessage, ex);
         return buildResponseEntity(apiError);
     }
 
@@ -211,6 +260,23 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
 
     private ResponseEntity<Object> buildResponseEntity(ApiError apiError) {
         return new ResponseEntity<>(apiError, apiError.getStatus());
+    }
+    
+    private String generateMessage(String entity, ErrorType errorType, Map<String, String> searchParams) {
+    	String errorCode = errorType.name();
+    	Object[] messageParams = new Object[] {StringUtils.capitalize(entity), searchParams};
+        String errorMessage = exceptionErrorMessageSource.getMessage(errorCode, messageParams, "Application Error", null);
+    	return errorMessage;
+    }
+
+    private<K, V> Map<K, V> toMap(
+            Class<K> keyType, Class<V> valueType, Object... entries) {
+        if (entries.length % 2 == 1)
+            throw new IllegalArgumentException("Invalid entries");
+        return IntStream.range(0, entries.length / 2).map(i -> i * 2)
+                .collect(HashMap::new,
+                        (m, i) -> m.put(keyType.cast(entries[i]), valueType.cast(entries[i + 1])),
+                        Map::putAll);
     }
 
 }
